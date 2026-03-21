@@ -1547,6 +1547,7 @@ button {
   color: var(--muted);
   line-height: 1.8;
   white-space: pre-wrap;
+  text-align: left;
 }
 
 .public-hero-placeholder {
