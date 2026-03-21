@@ -507,6 +507,16 @@ export function AdminWorkspace({
     setMessage("保存しました。");
   }
 
+  function buildBuilderPatch(form: FormRow, patch: Partial<FormRow> = {}) {
+    return {
+      header_title: form.header_title,
+      header_subtitle: form.header_subtitle,
+      description: form.description,
+      field_config: form.field_config,
+      ...patch,
+    };
+  }
+
   async function uploadAsset(
     event: ChangeEvent<HTMLInputElement>,
     assetType: "header" | "frame",
@@ -542,7 +552,7 @@ export function AdminWorkspace({
     const publicUrl = `${supabase.storage.from("form-assets").getPublicUrl(filePath).data.publicUrl}?v=${Date.now()}`;
 
     if (assetType === "header") {
-      await patchForm({ header_image_url: publicUrl });
+      await patchForm(buildBuilderPatch(activeForm, { header_image_url: publicUrl }));
     } else {
       let frameAspect = activeForm.composite_template?.frameAspect ?? defaultCompositeTemplate.frameAspect;
       try {
@@ -571,12 +581,7 @@ export function AdminWorkspace({
 
   async function saveBuilderDraft() {
     if (!activeForm) return;
-    await patchForm({
-      header_title: activeForm.header_title,
-      header_subtitle: activeForm.header_subtitle,
-      description: activeForm.description,
-      field_config: activeForm.field_config,
-    });
+    await patchForm(buildBuilderPatch(activeForm));
   }
 
   function setFieldConfigDraft(nextFields: FormField[]) {

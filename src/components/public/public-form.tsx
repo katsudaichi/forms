@@ -124,6 +124,7 @@ export function PublicForm({ formId }: { formId: string }) {
         <div className="eyebrow">出店者 登録フォーム</div>
         <h1>{form.header_title}</h1>
         <p>{form.header_subtitle}</p>
+        {form.description ? <div className="public-hero-description">{form.description}</div> : null}
       </div>
 
       <form className="public-body" onSubmit={handleSubmit}>
