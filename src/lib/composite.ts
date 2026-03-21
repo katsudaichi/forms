@@ -32,19 +32,27 @@ export function normalizeCompositeConfig(
   }
 
   if ("patterns" in input && Array.isArray(input.patterns) && input.patterns.length > 0) {
-    const patterns = input.patterns.map((pattern, index) => ({
-      id: pattern.id ?? `pattern-${index + 1}`,
-      name: pattern.name ?? `パターン ${index + 1}`,
-      template: {
-        ...structuredClone(defaultCompositeTemplate),
-        ...pattern.template,
-        photoArea: {
-          ...structuredClone(defaultCompositeTemplate.photoArea),
-          ...pattern.template?.photoArea,
+    const patterns = input.patterns
+      .filter((pattern): pattern is CompositePattern => Boolean(pattern && typeof pattern === "object"))
+      .map((pattern, index) => ({
+        id: pattern.id ?? `pattern-${index + 1}`,
+        name: pattern.name ?? `パターン ${index + 1}`,
+        template: {
+          ...structuredClone(defaultCompositeTemplate),
+          ...(pattern.template ?? {}),
+          photoArea: {
+            ...structuredClone(defaultCompositeTemplate.photoArea),
+            ...(pattern.template?.photoArea ?? {}),
+          },
+          textLayers: Array.isArray(pattern.template?.textLayers)
+            ? pattern.template.textLayers
+            : structuredClone(defaultCompositeTemplate.textLayers),
         },
-        textLayers: pattern.template?.textLayers ?? structuredClone(defaultCompositeTemplate.textLayers),
-      },
-    }));
+      }));
+
+    if (patterns.length === 0) {
+      return structuredClone(defaultCompositeConfig);
+    }
 
     return {
       activePatternId: input.activePatternId ?? patterns[0].id,
@@ -138,16 +146,18 @@ export function normalizeResponseImageTemplates(
 ) {
   if (!entries?.length) return [];
 
-  return entries.map((entry) => {
-    if ("patternId" in entry) {
-      return entry as ResponseImageTemplate;
-    }
+  return entries
+    .filter((entry): entry is ResponseImageTemplate | CompositeTemplate => Boolean(entry && typeof entry === "object"))
+    .map((entry) => {
+      if ("patternId" in entry) {
+        return entry as ResponseImageTemplate;
+      }
 
-    return {
-      patternId: config.activePatternId,
-      template: entry as CompositeTemplate,
-    };
-  });
+      return {
+        patternId: config.activePatternId,
+        template: entry as CompositeTemplate,
+      };
+    });
 }
 
 export function resolveResponseImageTemplate(

@@ -188,22 +188,41 @@ function mapResponseRow(
   },
   supabase: BrowserSupabase,
 ): ResponseWithImages {
-  const compositeConfig = normalizeCompositeConfig(form.composite_template);
-  return {
-    id: row.id,
-    formId: row.form_id,
-    data: row.data,
-    perImageTpls: normalizeResponseImageTemplates(row.per_image_tpls, compositeConfig),
-    isDirty: row.is_dirty,
-    submittedAt: row.submitted_at,
-    updatedAt: row.updated_at,
-    response_images: row.response_images ?? [],
-    images:
-      row.response_images?.map(
-        ({ storage_path }) =>
-          supabase.storage.from("response-images").getPublicUrl(storage_path).data.publicUrl,
-      ) ?? [],
-  };
+  try {
+    const compositeConfig = normalizeCompositeConfig(form.composite_template);
+    return {
+      id: row.id,
+      formId: row.form_id,
+      data: row.data,
+      perImageTpls: normalizeResponseImageTemplates(row.per_image_tpls, compositeConfig),
+      isDirty: row.is_dirty,
+      submittedAt: row.submitted_at,
+      updatedAt: row.updated_at,
+      response_images: row.response_images ?? [],
+      images:
+        row.response_images?.map(
+          ({ storage_path }) =>
+            supabase.storage.from("response-images").getPublicUrl(storage_path).data.publicUrl,
+        ) ?? [],
+    };
+  } catch (error) {
+    console.error("mapResponseRow failed", row.id, error);
+    return {
+      id: row.id,
+      formId: row.form_id,
+      data: row.data ?? {},
+      perImageTpls: [],
+      isDirty: row.is_dirty,
+      submittedAt: row.submitted_at,
+      updatedAt: row.updated_at,
+      response_images: row.response_images ?? [],
+      images:
+        row.response_images?.map(
+          ({ storage_path }) =>
+            supabase.storage.from("response-images").getPublicUrl(storage_path).data.publicUrl,
+        ) ?? [],
+    };
+  }
 }
 
 function normalizeFormRow(form: FormRow): FormRow {
