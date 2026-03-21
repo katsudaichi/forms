@@ -1245,6 +1245,55 @@ button {
 .post-snippet {
   min-width: 240px;
   max-width: 320px;
+  margin: 0;
+}
+
+.post-snippet-card {
+  position: relative;
+  min-width: 240px;
+  max-width: 320px;
+}
+
+.post-snippet-toggle {
+  display: grid;
+  width: 100%;
+  gap: 0.45rem;
+  padding: 0.25rem 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+}
+
+.post-snippet-card:not(.expanded) .post-snippet {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.post-snippet-more {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.post-copy-button {
+  position: absolute;
+  top: 0.15rem;
+  right: 0.15rem;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--muted);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.16s ease;
+}
+
+.post-snippet-card:hover .post-copy-button {
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .submitted-at {

@@ -61,6 +61,16 @@ export function PublicForm({ formId }: { formId: string }) {
     }
     if (!form) return;
 
+    const hasRequiredImageField = form.field_config.some(
+      (field) => field.type === "image" && field.required,
+    );
+    const validFiles = files.filter(Boolean);
+
+    if (hasRequiredImageField && validFiles.length === 0) {
+      setMessage("必須の画像を1枚以上アップロードしてください。");
+      return;
+    }
+
     setSubmitting(true);
     setMessage(null);
 
@@ -79,7 +89,7 @@ export function PublicForm({ formId }: { formId: string }) {
       return;
     }
 
-    for (const [index, file] of files.entries()) {
+    for (const [index, file] of validFiles.entries()) {
       const filePath = `${form.id}/${responseInsert.data.id}/${index}-${Date.now()}-${file.name}`;
       const upload = await supabase.storage.from("response-images").upload(filePath, file, {
         upsert: true,

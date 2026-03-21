@@ -358,6 +358,7 @@ export function AdminWorkspace({
   const [builderDirty, setBuilderDirty] = useState(false);
   const [postTextDraft, setPostTextDraft] = useState("");
   const [postTextDirty, setPostTextDirty] = useState(false);
+  const [expandedPostIds, setExpandedPostIds] = useState<string[]>([]);
   const [selectedComposerPatternId, setSelectedComposerPatternId] = useState<string | null>(null);
   const [openComposerPatternId, setOpenComposerPatternId] = useState<string | null>(null);
   const [selectedComposerLayerId, setSelectedComposerLayerId] = useState<string>("photo");
@@ -1042,6 +1043,7 @@ export function AdminWorkspace({
     }
 
     setResponses((current) => current.filter((response) => response.id !== responseId));
+    setExpandedPostIds((current) => current.filter((id) => id !== responseId));
     setMessage("回答を削除しました。");
   }
 
@@ -1272,6 +1274,14 @@ export function AdminWorkspace({
             }
           : response,
       ),
+    );
+  }
+
+  function togglePostExpansion(responseId: string) {
+    setExpandedPostIds((current) =>
+      current.includes(responseId)
+        ? current.filter((id) => id !== responseId)
+        : [...current, responseId],
     );
   }
 
@@ -2033,9 +2043,33 @@ export function AdminWorkspace({
                         </div>
                       </td>
                       <td>
-                        <pre className="post-snippet">
-                          {renderPostText(activeForm.post_template, response.data)}
-                        </pre>
+                        {(() => {
+                          const postText = renderPostText(activeForm.post_template, response.data);
+                          const expanded = expandedPostIds.includes(response.id);
+                          return (
+                            <div className={`post-snippet-card ${expanded ? "expanded" : ""}`}>
+                              <button
+                                type="button"
+                                className="post-copy-button"
+                                onClick={() => void navigator.clipboard?.writeText(postText)}
+                                aria-label="投稿文をコピー"
+                                title="コピー"
+                              >
+                                ⧉
+                              </button>
+                              <button
+                                type="button"
+                                className="post-snippet-toggle"
+                                onClick={() => togglePostExpansion(response.id)}
+                              >
+                                <pre className="post-snippet">{postText}</pre>
+                                <span className="post-snippet-more">
+                                  {expanded ? "閉じる" : "クリックで展開"}
+                                </span>
+                              </button>
+                            </div>
+                          );
+                        })()}
                       </td>
                       <td>
                         <div className="row-actions">
