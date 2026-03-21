@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Event Booth Studio MVP
 
-## Getting Started
+イベント出店フォームと管理ツールの MVP です。Next.js + Supabase で動作します。
 
-First, run the development server:
+## 主な機能
+
+- 管理者サインアップ / ログイン
+- テナント作成
+- 出店フォームビルダー
+- 公開フォームからの回答送信
+- 回答一覧と画像付き回答の確認
+- 画像合成設定
+- 投稿文設定
+
+## 必要な環境変数
+
+`.env.local` に以下を設定します。
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+```
+
+現状の MVP では `SUPABASE_SERVICE_ROLE_KEY` は未使用です。
+
+## セットアップ
+
+1. 依存関係をインストール
+
+```bash
+npm install
+```
+
+2. `.env.local` を作成
+
+```bash
+cp .env.example .env.local
+```
+
+3. Supabase の migration を適用
+
+- `supabase/migrations/001_initial.sql`
+- `supabase/migrations/002_public_submission_and_assets.sql`
+
+4. 開発サーバーを起動
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+5. 本番ビルド確認
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 現在の運用メモ
 
-## Learn More
+- 公開フォームの匿名回答確認のため、`public.responses` の RLS は一時的に無効化して運用しています
+- 本番化の前に `responses` の policy は締め直す前提です
 
-To learn more about Next.js, take a look at the following resources:
+## デプロイ
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+GitHub に push 後、Vercel でこのリポジトリを import してください。
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Vercel 側で設定する環境変数:
 
-## Deploy on Vercel
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+- `SUPABASE_SERVICE_ROLE_KEY`
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## ディレクトリ
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- `src/app`: App Router の画面
+- `src/components`: 管理画面 / 公開フォーム / 共通 UI
+- `src/lib`: 型、初期値、Supabase クライアント
+- `supabase/migrations`: DB 初期化と policy 修正 SQL
