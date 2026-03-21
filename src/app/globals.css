@@ -1267,6 +1267,14 @@ button {
   justify-content: start;
 }
 
+.responses-table .post-snippet-toggle,
+.responses-table .post-copy-button {
+  background: transparent;
+  color: inherit;
+  border: 0;
+  box-shadow: none;
+}
+
 .post-snippet-card:not(.expanded) .post-snippet {
   display: -webkit-box;
   -webkit-line-clamp: 6;
@@ -1299,6 +1307,12 @@ button {
 .post-snippet-card:hover .post-copy-button {
   opacity: 1;
   pointer-events: auto;
+}
+
+.responses-table .post-copy-button {
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid var(--line);
+  color: var(--muted);
 }
 
 .submitted-at {
