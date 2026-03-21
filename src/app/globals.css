@@ -1317,6 +1317,14 @@ button {
   flex-wrap: wrap;
 }
 
+.response-delete-button {
+  padding: 0.85rem 1.2rem;
+  border-radius: 999px;
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  background: rgba(239, 68, 68, 0.05);
+  color: #b91c1c;
+}
+
 .image-editor-modal {
   position: fixed;
   inset: 0;

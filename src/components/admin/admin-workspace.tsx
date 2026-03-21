@@ -1023,6 +1023,28 @@ export function AdminWorkspace({
     await saveResponse(response);
   }
 
+  async function deleteResponse(responseId: string) {
+    if (!supabase) return;
+
+    const confirmed = window.confirm("この回答を削除します。関連する画像も削除されます。");
+    if (!confirmed) return;
+
+    setSaving(true);
+    setMessage(null);
+
+    const result = await supabase.from("responses").delete().eq("id", responseId);
+
+    setSaving(false);
+
+    if (result.error) {
+      setMessage(result.error.message ?? "回答削除に失敗しました。");
+      return;
+    }
+
+    setResponses((current) => current.filter((response) => response.id !== responseId));
+    setMessage("回答を削除しました。");
+  }
+
   async function downloadResponseImages(response: ResponseWithImages) {
     if (!activeForm) return;
     const images = response.images ?? [];
@@ -2022,6 +2044,13 @@ export function AdminWorkspace({
                           </button>
                           <button type="button" onClick={() => saveResponse(response)}>
                             {response.isDirty ? "保存" : "更新済み"}
+                          </button>
+                          <button
+                            type="button"
+                            className="response-delete-button"
+                            onClick={() => void deleteResponse(response.id)}
+                          >
+                            削除
                           </button>
                         </div>
                       </td>
