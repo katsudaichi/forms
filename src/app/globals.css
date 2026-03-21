@@ -1261,7 +1261,10 @@ button {
   padding: 0.25rem 0;
   border: 0;
   background: transparent;
+  color: inherit;
+  border-radius: 0;
   text-align: left;
+  justify-content: start;
 }
 
 .post-snippet-card:not(.expanded) .post-snippet {
@@ -1289,6 +1292,8 @@ button {
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.16s ease;
+  padding: 0;
+  justify-content: center;
 }
 
 .post-snippet-card:hover .post-copy-button {
