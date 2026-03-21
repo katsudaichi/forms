@@ -1,4 +1,5 @@
 import {
+  CompositeConfig,
   CompositeTemplate,
   DbFormRow,
   FormField,
@@ -125,6 +126,17 @@ export const defaultCompositeTemplate: CompositeTemplate = {
   ],
 };
 
+export const defaultCompositeConfig: CompositeConfig = {
+  activePatternId: "pattern-1",
+  patterns: [
+    {
+      id: "pattern-1",
+      name: "パターン 1",
+      template: defaultCompositeTemplate,
+    },
+  ],
+};
+
 export function createStarterForm(tenantId: string): Omit<
   DbFormRow,
   "id" | "created_at" | "updated_at"
@@ -140,7 +152,7 @@ export function createStarterForm(tenantId: string): Omit<
     header_image_url: null,
     field_config: defaultFields,
     post_template: defaultPostTemplate,
-    composite_template: defaultCompositeTemplate,
+    composite_template: defaultCompositeConfig,
     col_widths: {
       shopName: 180,
       genre: 140,

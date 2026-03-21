@@ -8,18 +8,32 @@ import { ConfigNotice } from "@/components/shared/config-notice";
 import { CompositePreview } from "@/components/shared/composite-preview";
 import {
   createStarterForm,
+  defaultCompositeConfig,
   defaultCompositeTemplate,
   defaultPostTemplate,
 } from "@/lib/defaults";
-import { getPhotoScale, resolvePhotoArea } from "@/lib/composite";
+import {
+  addCompositePattern,
+  getActiveCompositePattern,
+  getPatternById,
+  getPhotoScale,
+  normalizeCompositeConfig,
+  normalizeResponseImageTemplates,
+  removeCompositePattern,
+  resolvePhotoArea,
+  resolveResponseImageTemplate,
+  updateCompositePattern,
+} from "@/lib/composite";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import {
+  CompositeConfig,
   CompositeTemplate,
   DbFormRow,
   DbResponseRow,
   FormField,
   PostSegment,
   ResponseRecord,
+  ResponseImageTemplate,
 } from "@/lib/types";
 
 type FormRow = DbFormRow;
@@ -168,16 +182,18 @@ function getStoragePathFromPublicUrl(publicUrl: string | null | undefined, bucke
 }
 
 function mapResponseRow(
+  form: FormRow,
   row: DbResponseRow & {
     response_images?: Array<{ storage_path: string; position: number }>;
   },
   supabase: BrowserSupabase,
 ): ResponseWithImages {
+  const compositeConfig = normalizeCompositeConfig(form.composite_template);
   return {
     id: row.id,
     formId: row.form_id,
     data: row.data,
-    perImageTpls: row.per_image_tpls ?? undefined,
+    perImageTpls: normalizeResponseImageTemplates(row.per_image_tpls, compositeConfig),
     isDirty: row.is_dirty,
     submittedAt: row.submitted_at,
     updatedAt: row.updated_at,
@@ -187,6 +203,13 @@ function mapResponseRow(
         ({ storage_path }) =>
           supabase.storage.from("response-images").getPublicUrl(storage_path).data.publicUrl,
       ) ?? [],
+  };
+}
+
+function normalizeFormRow(form: FormRow): FormRow {
+  return {
+    ...form,
+    composite_template: normalizeCompositeConfig(form.composite_template),
   };
 }
 
@@ -316,6 +339,8 @@ export function AdminWorkspace({
   const [builderDirty, setBuilderDirty] = useState(false);
   const [postTextDraft, setPostTextDraft] = useState("");
   const [postTextDirty, setPostTextDirty] = useState(false);
+  const [selectedComposerPatternId, setSelectedComposerPatternId] = useState<string | null>(null);
+  const [openComposerPatternId, setOpenComposerPatternId] = useState<string | null>(null);
   const [selectedComposerLayerId, setSelectedComposerLayerId] = useState<string>("photo");
   const [imageEditorTarget, setImageEditorTarget] = useState<{
     responseId: string;
@@ -379,7 +404,7 @@ export function AdminWorkspace({
         .eq("tenant_id", activeTenant.id)
         .order("created_at", { ascending: true });
 
-      const formRows = (formsResult.data ?? []) as FormRow[];
+      const formRows = ((formsResult.data ?? []) as FormRow[]).map(normalizeFormRow);
       setForms(formRows);
 
       const resolvedForm =
@@ -389,6 +414,11 @@ export function AdminWorkspace({
       setBuilderDirty(false);
       setPostTextDraft(resolvedForm ? postTemplateToEditorText(resolvedForm.post_template) : "");
       setPostTextDirty(false);
+      const initialPatternId = resolvedForm
+        ? getActiveCompositePattern(normalizeCompositeConfig(resolvedForm.composite_template)).id
+        : null;
+      setSelectedComposerPatternId(initialPatternId);
+      setOpenComposerPatternId(initialPatternId);
       setSelectedComposerLayerId("photo");
 
       const routeTenantSlug = activeTenant.slug || activeTenant.id;
@@ -408,7 +438,7 @@ export function AdminWorkspace({
           DbResponseRow & {
             response_images?: Array<{ storage_path: string; position: number }>;
           }
-        >).map((response) => mapResponseRow(response, supabase));
+        >).map((response) => mapResponseRow(resolvedForm, response, supabase));
         setResponses(mappedResponses);
       } else {
         setResponses([]);
@@ -423,6 +453,16 @@ export function AdminWorkspace({
   const selectedField = useMemo(
     () => activeForm?.field_config.find((field) => field.id === selectedFieldId) ?? null,
     [activeForm, selectedFieldId],
+  );
+  const composerConfig = useMemo(
+    () => normalizeCompositeConfig(activeForm?.composite_template ?? defaultCompositeConfig),
+    [activeForm],
+  );
+  const selectedComposerPattern = useMemo(
+    () =>
+      getPatternById(composerConfig, selectedComposerPatternId) ??
+      getActiveCompositePattern(composerConfig),
+    [composerConfig, selectedComposerPatternId],
   );
   const responseGenreFieldId =
     activeForm?.field_config.find((field) => field.id === "genre")?.id ??
@@ -593,9 +633,10 @@ export function AdminWorkspace({
       return;
     }
 
-    setActiveForm(result.data as FormRow);
+    const normalized = normalizeFormRow(result.data as FormRow);
+    setActiveForm(normalized);
     setForms((current) =>
-      current.map((form) => (form.id === result.data.id ? (result.data as FormRow) : form)),
+      current.map((form) => (form.id === result.data.id ? normalized : form)),
     );
     setBuilderDirty(false);
     setMessage("保存しました。");
@@ -622,11 +663,14 @@ export function AdminWorkspace({
 
     setSaving(true);
     const extension = file.name.includes(".") ? file.name.split(".").pop() : "png";
-    const filePath = `${activeForm.id}/${assetType}.${extension}`;
+    const filePath =
+      assetType === "header"
+        ? `${activeForm.id}/${assetType}.${extension}`
+        : `${activeForm.id}/${selectedComposerPattern.id}.${extension}`;
     const currentAssetUrl =
       assetType === "header"
         ? activeForm.header_image_url
-        : activeForm.composite_template?.frameUrl;
+        : selectedComposerPattern.template.frameUrl;
     const previousPath = getStoragePathFromPublicUrl(currentAssetUrl, "form-assets");
 
     if (previousPath && previousPath !== filePath) {
@@ -648,7 +692,7 @@ export function AdminWorkspace({
     if (assetType === "header") {
       await patchForm(buildBuilderPatch(activeForm, { header_image_url: publicUrl }));
     } else {
-      let frameAspect = activeForm.composite_template?.frameAspect ?? defaultCompositeTemplate.frameAspect;
+      let frameAspect = selectedComposerPattern.template.frameAspect ?? defaultCompositeTemplate.frameAspect;
       try {
         frameAspect = await getImageAspect(file);
       } catch (error) {
@@ -656,11 +700,18 @@ export function AdminWorkspace({
       }
 
       await patchForm({
-        composite_template: {
-          ...(activeForm.composite_template ?? defaultCompositeTemplate),
-          frameUrl: publicUrl,
-          frameAspect,
-        },
+        composite_template: updateCompositePattern(
+          composerConfig,
+          selectedComposerPattern.id,
+          (pattern) => ({
+            ...pattern,
+            template: {
+              ...pattern.template,
+              frameUrl: publicUrl,
+              frameAspect,
+            },
+          }),
+        ),
       });
     }
 
@@ -744,15 +795,28 @@ export function AdminWorkspace({
   }
 
   async function saveCompositeTemplate(nextTemplate: CompositeTemplate) {
-    await patchForm({ composite_template: nextTemplate });
+    await patchForm({
+      composite_template: updateCompositePattern(
+        composerConfig,
+        selectedComposerPattern.id,
+        (pattern) => ({ ...pattern, template: nextTemplate }),
+      ),
+    });
   }
 
   function updateComposerDraft(updater: (template: CompositeTemplate) => CompositeTemplate) {
     if (!activeForm) return;
-    const currentTemplate = activeForm.composite_template ?? defaultCompositeTemplate;
+    const currentTemplate = selectedComposerPattern.template ?? defaultCompositeTemplate;
     setActiveForm({
       ...activeForm,
-      composite_template: updater(currentTemplate),
+      composite_template: updateCompositePattern(
+        composerConfig,
+        selectedComposerPattern.id,
+        (pattern) => ({
+          ...pattern,
+          template: updater(currentTemplate),
+        }),
+      ),
     });
   }
 
@@ -761,10 +825,17 @@ export function AdminWorkspace({
     persist = false,
   ) {
     if (!activeForm) return;
-    const nextTemplate = updater(activeForm.composite_template ?? defaultCompositeTemplate);
+    const nextTemplate = updater(selectedComposerPattern.template ?? defaultCompositeTemplate);
     setActiveForm({
       ...activeForm,
-      composite_template: nextTemplate,
+      composite_template: updateCompositePattern(
+        composerConfig,
+        selectedComposerPattern.id,
+        (pattern) => ({
+          ...pattern,
+          template: nextTemplate,
+        }),
+      ),
     });
     if (persist) {
       void saveCompositeTemplate(nextTemplate);
@@ -773,16 +844,16 @@ export function AdminWorkspace({
 
   function persistCurrentCompositeTemplate() {
     if (!activeForm) return;
-    void saveCompositeTemplate(activeForm.composite_template ?? defaultCompositeTemplate);
+    void saveCompositeTemplate(selectedComposerPattern.template ?? defaultCompositeTemplate);
   }
 
   async function addTextLayerToComposer() {
     if (!activeForm) return;
     const nextLayerId = `layer-${crypto.randomUUID().slice(0, 8)}`;
     const nextTemplate = {
-      ...(activeForm.composite_template ?? defaultCompositeTemplate),
+      ...(selectedComposerPattern.template ?? defaultCompositeTemplate),
       textLayers: [
-        ...(activeForm.composite_template?.textLayers ?? []),
+        ...(selectedComposerPattern.template?.textLayers ?? []),
         {
           id: nextLayerId,
           fieldId:
@@ -805,13 +876,44 @@ export function AdminWorkspace({
   async function removeTextLayerFromComposer(layerId: string) {
     if (!activeForm) return;
     const nextTemplate = {
-      ...(activeForm.composite_template ?? defaultCompositeTemplate),
-      textLayers: (activeForm.composite_template?.textLayers ?? []).filter(
+      ...(selectedComposerPattern.template ?? defaultCompositeTemplate),
+      textLayers: (selectedComposerPattern.template?.textLayers ?? []).filter(
         (layer) => layer.id !== layerId,
       ),
     };
     setSelectedComposerLayerId("photo");
     await saveCompositeTemplate(nextTemplate);
+  }
+
+  async function addComposerPattern() {
+    if (!activeForm) return;
+    const nextConfig = addCompositePattern(composerConfig);
+    setSelectedComposerPatternId(nextConfig.activePatternId);
+    setOpenComposerPatternId(nextConfig.activePatternId);
+    setSelectedComposerLayerId("photo");
+    await patchForm({ composite_template: nextConfig });
+  }
+
+  async function deleteComposerPattern(patternId: string) {
+    if (!activeForm) return;
+    if (composerConfig.patterns.length === 1) return;
+    const confirmed = window.confirm("この画像合成パターンを削除します。");
+    if (!confirmed) return;
+    const nextConfig = removeCompositePattern(composerConfig, patternId);
+    setSelectedComposerPatternId(nextConfig.activePatternId);
+    setOpenComposerPatternId(nextConfig.activePatternId);
+    setSelectedComposerLayerId("photo");
+    await patchForm({ composite_template: nextConfig });
+  }
+
+  async function renameComposerPattern(patternId: string, name: string) {
+    if (!activeForm) return;
+    await patchForm({
+      composite_template: updateCompositePattern(composerConfig, patternId, (pattern) => ({
+        ...pattern,
+        name,
+      })),
+    });
   }
 
   async function saveResponse(response: ResponseWithImages) {
@@ -842,6 +944,32 @@ export function AdminWorkspace({
     setImageEditorSelectedLayerId("photo");
   }
 
+  function setPerImagePattern(
+    responseId: string,
+    imageIndex: number,
+    patternId: string,
+  ) {
+    if (!activeForm) return;
+    const config = normalizeCompositeConfig(activeForm.composite_template);
+    const pattern = getPatternById(config, patternId) ?? getActiveCompositePattern(config);
+
+    setResponses((current) =>
+      current.map((response) => {
+        if (response.id !== responseId) return response;
+        const templates = [...(response.perImageTpls ?? [])];
+        templates[imageIndex] = {
+          patternId: pattern.id,
+          template: structuredClone(pattern.template),
+        };
+        return {
+          ...response,
+          isDirty: true,
+          perImageTpls: templates,
+        };
+      }),
+    );
+  }
+
   function updatePerImageTemplate(
     responseId: string,
     imageIndex: number,
@@ -851,10 +979,12 @@ export function AdminWorkspace({
     setResponses((current) =>
       current.map((response) => {
         if (response.id !== responseId) return response;
-        const templates = [...(response.perImageTpls ?? [])];
-        const baseTemplate =
-          templates[imageIndex] ?? response.perImageTpls?.[imageIndex] ?? activeForm.composite_template ?? defaultCompositeTemplate;
-        templates[imageIndex] = updater(baseTemplate);
+        const templates = [...(response.perImageTpls ?? [])] as ResponseImageTemplate[];
+        const resolved = resolveResponseImageTemplate(templates[imageIndex], composerConfig);
+        templates[imageIndex] = {
+          patternId: resolved.patternId,
+          template: updater(resolved.template),
+        };
         return {
           ...response,
           isDirty: true,
@@ -878,9 +1008,7 @@ export function AdminWorkspace({
     const renderedImages = await Promise.all(
       images.map(async (imageUrl, index) => {
         const template =
-          response.perImageTpls?.[index] ??
-          activeForm.composite_template ??
-          defaultCompositeTemplate;
+          resolveResponseImageTemplate(response.perImageTpls?.[index], composerConfig).template;
 
         const [photoImage, frameImage] = await Promise.all([
           loadBrowserImage(imageUrl),
@@ -1023,7 +1151,7 @@ export function AdminWorkspace({
     }
 
     const nextResponses = ((result.data ?? []) as DbResponseRow[]).map((response) =>
-      mapResponseRow(response, supabase),
+      mapResponseRow(activeForm, response, supabase),
     );
     setResponses((current) => [...nextResponses, ...current]);
     setMessage("サンプル回答を追加しました。");
@@ -1075,6 +1203,7 @@ export function AdminWorkspace({
     }
 
     const mapped = mapResponseRow(
+      activeForm,
       {
         ...(responseResult.data as DbResponseRow),
         response_images: [{ storage_path: storagePath, position: 0 }],
@@ -1841,9 +1970,10 @@ export function AdminWorkspace({
                                 <div className="image-card-preview">
                                   <CompositePreview
                                     template={
-                                      response.perImageTpls?.[imageIndex] ??
-                                      activeForm.composite_template ??
-                                      defaultCompositeTemplate
+                                      resolveResponseImageTemplate(
+                                        response.perImageTpls?.[imageIndex],
+                                        composerConfig,
+                                      ).template
                                     }
                                     values={response.data}
                                     imageUrl={image}
@@ -1883,10 +2013,11 @@ export function AdminWorkspace({
                 const response = responses.find((item) => item.id === imageEditorTarget.responseId) ?? null;
                 if (!response || !activeForm) return null;
                 const imageUrl = response.images[imageEditorTarget.imageIndex] ?? null;
-                const template =
-                  response.perImageTpls?.[imageEditorTarget.imageIndex] ??
-                  activeForm.composite_template ??
-                  defaultCompositeTemplate;
+                const resolvedImageTemplate = resolveResponseImageTemplate(
+                  response.perImageTpls?.[imageEditorTarget.imageIndex],
+                  composerConfig,
+                );
+                const template = resolvedImageTemplate.template;
 
                 return (
                   <div className="image-editor-modal" onClick={() => setImageEditorTarget(null)}>
@@ -1915,6 +2046,21 @@ export function AdminWorkspace({
 
                       <div className="image-editor-layout">
                         <div className="image-editor-elements">
+                          <div className="composer-section-label">適用パターン</div>
+                          <div className="image-editor-patterns">
+                            {composerConfig.patterns.map((pattern) => (
+                              <button
+                                key={pattern.id}
+                                type="button"
+                                className={`composer-element-row ${resolvedImageTemplate.patternId === pattern.id ? "active" : ""}`}
+                                onClick={() => setPerImagePattern(response.id, imageEditorTarget.imageIndex, pattern.id)}
+                              >
+                                <span className="composer-asset-icon">#</span>
+                                <span>{pattern.name}</span>
+                              </button>
+                            ))}
+                          </div>
+
                           <div className="composer-section-label">調整対象</div>
                           <button
                             type="button"
@@ -2081,59 +2227,136 @@ export function AdminWorkspace({
               <div className="panel-head">
                 <div>
                   <h2>構成要素</h2>
-                  <p>枠、写真エリア、テキストレイヤーを管理します。</p>
+                  <p>パターンごとに枠、写真エリア、テキストレイヤーを管理します。</p>
                 </div>
+                <button type="button" onClick={() => void addComposerPattern()}>
+                  パターン追加
+                </button>
               </div>
               <div className="composer-column elements">
-                <div className="composer-section-label">枠画像</div>
-                <label className="composer-asset-row">
-                  <span className="composer-asset-icon">🖼</span>
-                  <span>{activeForm.composite_template?.frameUrl ? "変更する" : "アップロード"}</span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(event) => uploadAsset(event, "frame")}
-                  />
-                </label>
-
-                <div className="composer-section-label">出店者画像</div>
-                <button
-                  type="button"
-                  className={`composer-element-row ${selectedComposerLayerId === "photo" ? "active" : ""}`}
-                  onClick={() => setSelectedComposerLayerId("photo")}
-                >
-                  <span className="composer-asset-icon">📷</span>
-                  <span>出店者画像エリア</span>
-                </button>
-
-                <div className="composer-section-label">テキスト</div>
-                <div className="composer-elements-list">
-                  {(activeForm.composite_template?.textLayers ?? []).map((layer) => (
-                    <div key={layer.id} className="composer-text-row">
+                {composerConfig.patterns.map((pattern) => {
+                  const isOpen = openComposerPatternId === pattern.id;
+                  const isSelected = selectedComposerPatternId === pattern.id;
+                  return (
+                    <div key={pattern.id} className="composer-pattern-card">
                       <button
                         type="button"
-                        className={`composer-element-row ${selectedComposerLayerId === layer.id ? "active" : ""}`}
-                        onClick={() => setSelectedComposerLayerId(layer.id)}
+                        className={`composer-pattern-trigger ${isSelected ? "active" : ""}`}
+                        onClick={() => {
+                          setSelectedComposerPatternId(pattern.id);
+                          setOpenComposerPatternId((current) => (current === pattern.id ? null : pattern.id));
+                          setSelectedComposerLayerId("photo");
+                        }}
                       >
-                        <span className="composer-text-mark">T</span>
-                        <span>
-                          {activeForm.field_config.find((field) => field.id === layer.fieldId)?.label ??
-                            "テキスト"}
-                        </span>
+                        <span>{pattern.name}</span>
+                        <span>{isOpen ? "▾" : "▸"}</span>
                       </button>
-                      <button
-                        type="button"
-                        className="composer-remove"
-                        onClick={() => void removeTextLayerFromComposer(layer.id)}
-                      >
-                        ×
-                      </button>
+
+                      {isOpen ? (
+                        <div className="composer-pattern-body">
+                          <label className="composer-select-row">
+                            <span>パターン名</span>
+                            <input
+                              value={pattern.name}
+                              onChange={(event) =>
+                                setActiveForm({
+                                  ...activeForm,
+                                  composite_template: updateCompositePattern(
+                                    composerConfig,
+                                    pattern.id,
+                                    (current) => ({ ...current, name: event.target.value }),
+                                  ),
+                                })
+                              }
+                              onBlur={(event) => void renameComposerPattern(pattern.id, event.target.value)}
+                            />
+                          </label>
+
+                          <div className="composer-section-label">枠画像</div>
+                          <label className="composer-asset-row">
+                            <span className="composer-asset-icon">🖼</span>
+                            <span>{pattern.template.frameUrl ? "変更する" : "アップロード"}</span>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={(event) => {
+                                setSelectedComposerPatternId(pattern.id);
+                                void uploadAsset(event, "frame");
+                              }}
+                            />
+                          </label>
+
+                          <div className="composer-section-label">出店者画像</div>
+                          <button
+                            type="button"
+                            className={`composer-element-row ${isSelected && selectedComposerLayerId === "photo" ? "active" : ""}`}
+                            onClick={() => {
+                              setSelectedComposerPatternId(pattern.id);
+                              setSelectedComposerLayerId("photo");
+                            }}
+                          >
+                            <span className="composer-asset-icon">📷</span>
+                            <span>出店者画像エリア</span>
+                          </button>
+
+                          <div className="composer-section-label">テキスト</div>
+                          <div className="composer-elements-list">
+                            {pattern.template.textLayers.map((layer) => (
+                              <div key={layer.id} className="composer-text-row">
+                                <button
+                                  type="button"
+                                  className={`composer-element-row ${isSelected && selectedComposerLayerId === layer.id ? "active" : ""}`}
+                                  onClick={() => {
+                                    setSelectedComposerPatternId(pattern.id);
+                                    setSelectedComposerLayerId(layer.id);
+                                  }}
+                                >
+                                  <span className="composer-text-mark">T</span>
+                                  <span>
+                                    {activeForm.field_config.find((field) => field.id === layer.fieldId)?.label ??
+                                      "テキスト"}
+                                  </span>
+                                </button>
+                                <button
+                                  type="button"
+                                  className="composer-remove"
+                                  onClick={() => {
+                                    setSelectedComposerPatternId(pattern.id);
+                                    void removeTextLayerFromComposer(layer.id);
+                                  }}
+                                >
+                                  ×
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="composer-pattern-actions">
+                            <button
+                              type="button"
+                              className="composer-add-text"
+                              onClick={() => {
+                                setSelectedComposerPatternId(pattern.id);
+                                void addTextLayerToComposer();
+                              }}
+                            >
+                              ＋ テキストを追加
+                            </button>
+                            {composerConfig.patterns.length > 1 ? (
+                              <button
+                                type="button"
+                                className="composer-delete-pattern"
+                                onClick={() => void deleteComposerPattern(pattern.id)}
+                              >
+                                パターン削除
+                              </button>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
-                  ))}
-                </div>
-                <button type="button" className="composer-add-text" onClick={() => void addTextLayerToComposer()}>
-                  ＋ テキストを追加
-                </button>
+                  );
+                })}
               </div>
             </section>
 
@@ -2147,7 +2370,7 @@ export function AdminWorkspace({
               <div className="composer-column canvas">
                 <div className="composer-canvas-frame">
                   <CompositePreview
-                    template={activeForm.composite_template ?? defaultCompositeTemplate}
+                    template={selectedComposerPattern.template ?? defaultCompositeTemplate}
                     values={responses[0]?.data ?? {}}
                     imageUrl={responses[0]?.images?.[0] ?? null}
                     selectedLayerId={selectedComposerLayerId}
@@ -2173,12 +2396,12 @@ export function AdminWorkspace({
                     <div className="composer-props-title">📷 出店者画像エリア</div>
                     <div className="composer-props-group">位置・スケール</div>
                     {[
-                      ["x", "X", activeForm.composite_template?.photoArea?.x ?? 6, 0, 80],
-                      ["y", "Y", activeForm.composite_template?.photoArea?.y ?? 6, 0, 80],
+                      ["x", "X", selectedComposerPattern.template?.photoArea?.x ?? 6, 0, 80],
+                      ["y", "Y", selectedComposerPattern.template?.photoArea?.y ?? 6, 0, 80],
                       [
                         "scale",
                         "Scale",
-                        getPhotoScale(activeForm.composite_template ?? defaultCompositeTemplate),
+                        getPhotoScale(selectedComposerPattern.template ?? defaultCompositeTemplate),
                         40,
                         180,
                       ],
@@ -2208,7 +2431,7 @@ export function AdminWorkspace({
                 ) : (
                   (() => {
                     const layer =
-                      activeForm.composite_template?.textLayers.find(
+                      selectedComposerPattern.template?.textLayers.find(
                         (item) => item.id === selectedComposerLayerId,
                       ) ?? null;
                     if (!layer) {

@@ -51,6 +51,22 @@ export interface CompositeTemplate {
   textLayers: TextLayer[];
 }
 
+export interface CompositePattern {
+  id: string;
+  name: string;
+  template: CompositeTemplate;
+}
+
+export interface CompositeConfig {
+  activePatternId: string;
+  patterns: CompositePattern[];
+}
+
+export interface ResponseImageTemplate {
+  patternId: string;
+  template?: CompositeTemplate;
+}
+
 export interface FormDefinition {
   id: string;
   tenantSlug: string;
@@ -62,7 +78,7 @@ export interface FormDefinition {
   headerImageUrl: string | null;
   fieldConfig: FormField[];
   postTemplate: PostSegment[];
-  compositeTemplate: CompositeTemplate;
+  compositeTemplate: CompositeConfig;
   colWidths: Record<string, number>;
   createdAt: string;
   updatedAt: string;
@@ -73,7 +89,7 @@ export interface ResponseRecord {
   formId: string;
   data: Record<string, string | string[]>;
   images: string[];
-  perImageTpls?: CompositeTemplate[];
+  perImageTpls?: ResponseImageTemplate[];
   isDirty: boolean;
   submittedAt: string;
   updatedAt: string;
@@ -101,7 +117,7 @@ export interface DbFormRow {
   header_image_url: string | null;
   field_config: FormField[];
   post_template: PostSegment[];
-  composite_template: CompositeTemplate;
+  composite_template: CompositeConfig | CompositeTemplate;
   col_widths: Record<string, number>;
   created_at?: string;
   updated_at?: string;
@@ -111,7 +127,7 @@ export interface DbResponseRow {
   id: string;
   form_id: string;
   data: Record<string, string | string[]>;
-  per_image_tpls?: CompositeTemplate[] | null;
+  per_image_tpls?: ResponseImageTemplate[] | CompositeTemplate[] | null;
   is_dirty: boolean;
   submitted_at: string;
   updated_at: string;
