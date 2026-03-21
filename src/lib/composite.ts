@@ -32,22 +32,28 @@ export function normalizeCompositeConfig(
   }
 
   if ("patterns" in input && Array.isArray(input.patterns) && input.patterns.length > 0) {
-    return {
-      activePatternId: input.activePatternId ?? input.patterns[0].id,
-      patterns: input.patterns.map((pattern, index) => ({
-        id: pattern.id ?? `pattern-${index + 1}`,
-        name: pattern.name ?? `パターン ${index + 1}`,
-        template: {
-          ...structuredClone(defaultCompositeTemplate),
-          ...pattern.template,
-          photoArea: {
-            ...structuredClone(defaultCompositeTemplate.photoArea),
-            ...pattern.template?.photoArea,
-          },
-          textLayers: pattern.template?.textLayers ?? structuredClone(defaultCompositeTemplate.textLayers),
+    const patterns = input.patterns.map((pattern, index) => ({
+      id: pattern.id ?? `pattern-${index + 1}`,
+      name: pattern.name ?? `パターン ${index + 1}`,
+      template: {
+        ...structuredClone(defaultCompositeTemplate),
+        ...pattern.template,
+        photoArea: {
+          ...structuredClone(defaultCompositeTemplate.photoArea),
+          ...pattern.template?.photoArea,
         },
-      })),
+        textLayers: pattern.template?.textLayers ?? structuredClone(defaultCompositeTemplate.textLayers),
+      },
+    }));
+
+    return {
+      activePatternId: input.activePatternId ?? patterns[0].id,
+      patterns,
     };
+  }
+
+  if ("patterns" in input && Array.isArray(input.patterns) && input.patterns.length === 0) {
+    return structuredClone(defaultCompositeConfig);
   }
 
   const legacyTemplate = input as CompositeTemplate;
@@ -78,6 +84,10 @@ export function getPatternById(config: CompositeConfig, patternId: string | null
 }
 
 export function getActiveCompositePattern(config: CompositeConfig) {
+  if (config.patterns.length === 0) {
+    return structuredClone(defaultCompositeConfig.patterns[0]);
+  }
+
   return getPatternById(config, config.activePatternId) ?? config.patterns[0];
 }
 

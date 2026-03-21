@@ -357,94 +357,98 @@ export function AdminWorkspace({
       }
 
       setLoading(true);
+      setMessage(null);
 
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
+      try {
+        const {
+          data: { user },
+        } = await supabase.auth.getUser();
 
-      if (!user) {
-        router.push("/login");
-        return;
-      }
+        if (!user) {
+          router.push("/login");
+          return;
+        }
 
-      const memberships = await supabase
-        .from("tenant_members")
-        .select("tenant_id")
-        .eq("user_id", user.id);
+        const memberships = await supabase
+          .from("tenant_members")
+          .select("tenant_id")
+          .eq("user_id", user.id);
 
-      const tenantIds = memberships.data?.map((item) => item.tenant_id) ?? [];
+        const tenantIds = memberships.data?.map((item) => item.tenant_id) ?? [];
 
-      if (tenantIds.length === 0) {
+        if (tenantIds.length === 0) {
+          return;
+        }
+
+        const tenantsResult = await supabase
+          .from("tenants")
+          .select("id,name,slug")
+          .in("id", tenantIds)
+          .order("created_at", { ascending: true });
+
+        const tenantRows = (tenantsResult.data ?? []) as TenantRow[];
+        setTenants(tenantRows);
+
+        const activeTenant =
+          tenantRows.find((tenant) => tenant.slug === tenantSlug) ?? tenantRows[0] ?? null;
+
+        if (!activeTenant) {
+          return;
+        }
+
+        setTenantId(activeTenant.id);
+
+        const formsResult = await supabase
+          .from("forms")
+          .select("*")
+          .eq("tenant_id", activeTenant.id)
+          .order("created_at", { ascending: true });
+
+        const formRows = ((formsResult.data ?? []) as FormRow[]).map(normalizeFormRow);
+        setForms(formRows);
+
+        const resolvedForm =
+          formRows.find((form) => form.id === formId) ?? formRows[0] ?? null;
+        setActiveForm(resolvedForm);
+        setOpenFormId(resolvedForm?.id ?? formRows[0]?.id ?? null);
+        setBuilderDirty(false);
+        setPostTextDraft(resolvedForm ? postTemplateToEditorText(resolvedForm.post_template) : "");
+        setPostTextDirty(false);
+        const initialPatternId = resolvedForm
+          ? getActiveCompositePattern(normalizeCompositeConfig(resolvedForm.composite_template)).id
+          : null;
+        setSelectedComposerPatternId(initialPatternId);
+        setOpenComposerPatternId(initialPatternId);
+        setSelectedComposerLayerId("photo");
+
+        const routeTenantSlug = activeTenant.slug || activeTenant.id;
+
+        if (!formId && resolvedForm) {
+          router.replace(`/admin/${routeTenantSlug}/${resolvedForm.id}/builder`);
+        }
+
+        if (resolvedForm) {
+          const responseResult = await supabase
+            .from("responses")
+            .select("id,form_id,data,per_image_tpls,is_dirty,submitted_at,updated_at,response_images(storage_path,position)")
+            .eq("form_id", resolvedForm.id)
+            .order("submitted_at", { ascending: false });
+
+          const mappedResponses = ((responseResult.data ?? []) as Array<
+            DbResponseRow & {
+              response_images?: Array<{ storage_path: string; position: number }>;
+            }
+          >).map((response) => mapResponseRow(resolvedForm, response, supabase));
+          setResponses(mappedResponses);
+        } else {
+          setResponses([]);
+        }
+      } catch (error) {
+        console.error(error);
+        setMessage("管理画面の読み込みに失敗しました。再読み込みしてください。");
+      } finally {
         setLoading(false);
-        return;
       }
-
-      const tenantsResult = await supabase
-        .from("tenants")
-        .select("id,name,slug")
-        .in("id", tenantIds)
-        .order("created_at", { ascending: true });
-
-      const tenantRows = (tenantsResult.data ?? []) as TenantRow[];
-      setTenants(tenantRows);
-
-      const activeTenant =
-        tenantRows.find((tenant) => tenant.slug === tenantSlug) ?? tenantRows[0] ?? null;
-
-      if (!activeTenant) {
-        setLoading(false);
-        return;
-      }
-
-      setTenantId(activeTenant.id);
-
-      const formsResult = await supabase
-        .from("forms")
-        .select("*")
-        .eq("tenant_id", activeTenant.id)
-        .order("created_at", { ascending: true });
-
-      const formRows = ((formsResult.data ?? []) as FormRow[]).map(normalizeFormRow);
-      setForms(formRows);
-
-      const resolvedForm =
-        formRows.find((form) => form.id === formId) ?? formRows[0] ?? null;
-      setActiveForm(resolvedForm);
-      setOpenFormId(resolvedForm?.id ?? formRows[0]?.id ?? null);
-      setBuilderDirty(false);
-      setPostTextDraft(resolvedForm ? postTemplateToEditorText(resolvedForm.post_template) : "");
-      setPostTextDirty(false);
-      const initialPatternId = resolvedForm
-        ? getActiveCompositePattern(normalizeCompositeConfig(resolvedForm.composite_template)).id
-        : null;
-      setSelectedComposerPatternId(initialPatternId);
-      setOpenComposerPatternId(initialPatternId);
-      setSelectedComposerLayerId("photo");
-
-      const routeTenantSlug = activeTenant.slug || activeTenant.id;
-
-      if (!formId && resolvedForm) {
-        router.replace(`/admin/${routeTenantSlug}/${resolvedForm.id}/builder`);
-      }
-
-      if (resolvedForm) {
-        const responseResult = await supabase
-          .from("responses")
-          .select("id,form_id,data,per_image_tpls,is_dirty,submitted_at,updated_at,response_images(storage_path,position)")
-          .eq("form_id", resolvedForm.id)
-          .order("submitted_at", { ascending: false });
-
-        const mappedResponses = ((responseResult.data ?? []) as Array<
-          DbResponseRow & {
-            response_images?: Array<{ storage_path: string; position: number }>;
-          }
-        >).map((response) => mapResponseRow(resolvedForm, response, supabase));
-        setResponses(mappedResponses);
-      } else {
-        setResponses([]);
-      }
-
-      setLoading(false);
     }
 
     void load();
