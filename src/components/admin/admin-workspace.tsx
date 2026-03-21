@@ -11,6 +11,7 @@ import {
   defaultCompositeTemplate,
   defaultPostTemplate,
 } from "@/lib/defaults";
+import { getPhotoScale, resolvePhotoArea } from "@/lib/composite";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import {
   CompositeTemplate,
@@ -905,10 +906,11 @@ export function AdminWorkspace({
         context.fillStyle = "#ffffff";
         context.fillRect(0, 0, canvasWidth, canvasHeight);
 
-        const photoX = (template.photoArea.x / 100) * canvasWidth;
-        const photoY = (template.photoArea.y / 100) * canvasHeight;
-        const photoW = (template.photoArea.w / 100) * canvasWidth;
-        const photoH = (template.photoArea.h / 100) * canvasHeight;
+        const resolvedPhotoArea = resolvePhotoArea(template);
+        const photoX = (resolvedPhotoArea.x / 100) * canvasWidth;
+        const photoY = (resolvedPhotoArea.y / 100) * canvasHeight;
+        const photoW = (resolvedPhotoArea.w / 100) * canvasWidth;
+        const photoH = (resolvedPhotoArea.h / 100) * canvasHeight;
 
         drawContainedImage(context, photoImage, photoX, photoY, photoW, photoH);
 
@@ -1974,8 +1976,7 @@ export function AdminWorkspace({
                               {[
                                 ["x", "X", template.photoArea.x, 0, 80],
                                 ["y", "Y", template.photoArea.y, 0, 80],
-                                ["w", "W", template.photoArea.w, 20, 100],
-                                ["h", "H", template.photoArea.h, 20, 100],
+                                ["scale", "Scale", getPhotoScale(template), 40, 180],
                               ].map(([key, label, value, min, max]) => (
                                 <label key={key} className="composer-slider-row">
                                   <span>{label}</span>
@@ -2170,12 +2171,17 @@ export function AdminWorkspace({
                 {selectedComposerLayerId === "photo" ? (
                   <>
                     <div className="composer-props-title">📷 出店者画像エリア</div>
-                    <div className="composer-props-group">位置・サイズ（%）</div>
+                    <div className="composer-props-group">位置・スケール</div>
                     {[
                       ["x", "X", activeForm.composite_template?.photoArea?.x ?? 6, 0, 80],
                       ["y", "Y", activeForm.composite_template?.photoArea?.y ?? 6, 0, 80],
-                      ["w", "W", activeForm.composite_template?.photoArea?.w ?? 88, 20, 100],
-                      ["h", "H", activeForm.composite_template?.photoArea?.h ?? 62, 20, 100],
+                      [
+                        "scale",
+                        "Scale",
+                        getPhotoScale(activeForm.composite_template ?? defaultCompositeTemplate),
+                        40,
+                        180,
+                      ],
                     ].map(([key, label, value, min, max]) => (
                       <label key={key} className="composer-slider-row">
                         <span>{label}</span>

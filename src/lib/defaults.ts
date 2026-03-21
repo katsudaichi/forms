@@ -84,7 +84,7 @@ export const defaultPostTemplate: PostSegment[] = [
 export const defaultCompositeTemplate: CompositeTemplate = {
   frameUrl: null,
   frameAspect: 1,
-  photoArea: { x: 6, y: 6, w: 88, h: 62 },
+  photoArea: { x: 6, y: 6, w: 88, h: 62, scale: 100 },
   textLayers: [
     {
       id: "shop-layer",

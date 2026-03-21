@@ -46,6 +46,7 @@ export interface CompositeTemplate {
     y: number;
     w: number;
     h: number;
+    scale?: number;
   };
   textLayers: TextLayer[];
 }

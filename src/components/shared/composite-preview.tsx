@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 
+import { resolvePhotoArea } from "@/lib/composite";
 import { CompositeTemplate } from "@/lib/types";
 
 const COMPOSITE_REFERENCE_WIDTH = 560;
@@ -38,6 +39,7 @@ export function CompositePreview({
   }, []);
 
   const scale = containerWidth / COMPOSITE_REFERENCE_WIDTH;
+  const resolvedPhotoArea = resolvePhotoArea(template);
 
   return (
     <div
@@ -49,10 +51,10 @@ export function CompositePreview({
         className="composite-photo"
         data-selected={selectedLayerId === "photo" ? "true" : "false"}
         style={{
-          left: `${template.photoArea.x}%`,
-          top: `${template.photoArea.y}%`,
-          width: `${template.photoArea.w}%`,
-          height: `${template.photoArea.h}%`,
+          left: `${resolvedPhotoArea.x}%`,
+          top: `${resolvedPhotoArea.y}%`,
+          width: `${resolvedPhotoArea.w}%`,
+          height: `${resolvedPhotoArea.h}%`,
         }}
         onClick={() => onSelectLayer?.("photo")}
       >
