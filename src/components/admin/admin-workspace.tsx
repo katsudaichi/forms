@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChangeEvent, FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 
 import { ConfigNotice } from "@/components/shared/config-notice";
 import { CompositePreview } from "@/components/shared/composite-preview";
@@ -76,6 +76,54 @@ function renderPostText(segments: PostSegment[], data: ResponseRecord["data"]) {
       return Array.isArray(raw) ? raw.join(" / ") : raw ?? "";
     })
     .join("");
+}
+
+function postTemplateToEditorText(segments: PostSegment[]) {
+  return segments
+    .map((segment) => (segment.type === "text" ? segment.value : `{{${segment.value}}}`))
+    .join("");
+}
+
+function editorTextToPostTemplate(value: string) {
+  const segments: PostSegment[] = [];
+  const tokenPattern = /\{\{([^}]+)\}\}/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+
+  while ((match = tokenPattern.exec(value)) !== null) {
+    if (match.index > lastIndex) {
+      segments.push({
+        id: `seg-${crypto.randomUUID()}`,
+        type: "text",
+        value: value.slice(lastIndex, match.index),
+      });
+    }
+
+    segments.push({
+      id: `seg-${crypto.randomUUID()}`,
+      type: "field",
+      value: match[1].trim(),
+    });
+    lastIndex = match.index + match[0].length;
+  }
+
+  if (lastIndex < value.length) {
+    segments.push({
+      id: `seg-${crypto.randomUUID()}`,
+      type: "text",
+      value: value.slice(lastIndex),
+    });
+  }
+
+  if (segments.length === 0) {
+    segments.push({
+      id: `seg-${crypto.randomUUID()}`,
+      type: "text",
+      value: "",
+    });
+  }
+
+  return segments;
 }
 
 function getImageAspect(file: File) {
@@ -265,12 +313,15 @@ export function AdminWorkspace({
   const [answerSearch, setAnswerSearch] = useState("");
   const [answerGenre, setAnswerGenre] = useState("all");
   const [builderDirty, setBuilderDirty] = useState(false);
+  const [postTextDraft, setPostTextDraft] = useState("");
+  const [postTextDirty, setPostTextDirty] = useState(false);
   const [selectedComposerLayerId, setSelectedComposerLayerId] = useState<string>("photo");
   const [imageEditorTarget, setImageEditorTarget] = useState<{
     responseId: string;
     imageIndex: number;
   } | null>(null);
   const [imageEditorSelectedLayerId, setImageEditorSelectedLayerId] = useState<string>("photo");
+  const postTextEditorRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -335,6 +386,8 @@ export function AdminWorkspace({
       setActiveForm(resolvedForm);
       setOpenFormId(resolvedForm?.id ?? formRows[0]?.id ?? null);
       setBuilderDirty(false);
+      setPostTextDraft(resolvedForm ? postTemplateToEditorText(resolvedForm.post_template) : "");
+      setPostTextDirty(false);
       setSelectedComposerLayerId("photo");
 
       const routeTenantSlug = activeTenant.slug || activeTenant.id;
@@ -650,9 +703,43 @@ export function AdminWorkspace({
   function updatePostTemplate(nextTemplate: PostSegment[], persist = false) {
     if (!activeForm) return;
     setActiveForm({ ...activeForm, post_template: nextTemplate });
+    setPostTextDraft(postTemplateToEditorText(nextTemplate));
+    setPostTextDirty(false);
     if (persist) {
       void savePostTemplate(nextTemplate);
     }
+  }
+
+  function insertPostFieldToken(fieldId: string) {
+    const textarea = postTextEditorRef.current;
+    const token = `{{${fieldId}}}`;
+
+    if (!textarea) {
+      setPostTextDraft((current) => `${current}${token}`);
+      setPostTextDirty(true);
+      return;
+    }
+
+    const start = textarea.selectionStart ?? postTextDraft.length;
+    const end = textarea.selectionEnd ?? postTextDraft.length;
+    const nextValue = `${postTextDraft.slice(0, start)}${token}${postTextDraft.slice(end)}`;
+
+    setPostTextDraft(nextValue);
+    setPostTextDirty(true);
+
+    requestAnimationFrame(() => {
+      textarea.focus();
+      const nextCursor = start + token.length;
+      textarea.setSelectionRange(nextCursor, nextCursor);
+    });
+  }
+
+  async function savePostTextDraft() {
+    if (!activeForm) return;
+    const nextTemplate = editorTextToPostTemplate(postTextDraft);
+    setActiveForm({ ...activeForm, post_template: nextTemplate });
+    setPostTextDirty(false);
+    await savePostTemplate(nextTemplate);
   }
 
   async function saveCompositeTemplate(nextTemplate: CompositeTemplate) {
@@ -2236,11 +2323,26 @@ export function AdminWorkspace({
               <div className="posttext-head">
                 <div>
                   <h2>投稿文テンプレート</h2>
-                  <p>フォーム項目のタグをクリックして挿入。テキストは直接編集できます。</p>
+                  <p>自然文を書きながら、カーソル位置にフォーム項目タグを挿入できます。</p>
                 </div>
-                <button type="button" className="ghost-button" onClick={() => savePostTemplate(defaultPostTemplate)}>
-                  初期化
-                </button>
+                <div className="posttext-head-actions">
+                  <button
+                    type="button"
+                    className="ghost-button"
+                    onClick={() => {
+                      const nextText = postTemplateToEditorText(defaultPostTemplate);
+                      setPostTextDraft(nextText);
+                      setPostTextDirty(true);
+                    }}
+                  >
+                    初期化
+                  </button>
+                  {postTextDirty ? (
+                    <button type="button" onClick={() => void savePostTextDraft()}>
+                      保存
+                    </button>
+                  ) : null}
+                </div>
               </div>
 
               <div className="posttext-insert">
@@ -2252,102 +2354,42 @@ export function AdminWorkspace({
                       key={field.id}
                       type="button"
                       className={`posttext-token tone-${index % 4}`}
-                      onClick={() =>
-                        updatePostTemplate(
-                          [
-                            ...activeForm.post_template,
-                            { id: `seg-${crypto.randomUUID()}`, type: "field", value: field.id },
-                          ],
-                          true,
-                        )
-                      }
+                      onClick={() => insertPostFieldToken(field.id)}
                     >
-                      + {field.label}
+                      + {field.label} <small>{`{{${field.id}}}`}</small>
                     </button>
                   ))}
               </div>
 
               <div className="posttext-canvas">
-                {activeForm.post_template.map((segment, index) =>
-                  segment.type === "text" ? (
-                    <span key={segment.id} className="posttext-inline-text">
-                      <span
-                        contentEditable
-                        suppressContentEditableWarning
-                        className="posttext-editable"
-                        onBlur={(event) => {
-                          const next = [...activeForm.post_template];
-                          next[index] = { ...segment, value: event.currentTarget.innerText };
-                          updatePostTemplate(next, true);
-                        }}
-                      >
-                        {segment.value}
-                      </span>
-                    </span>
-                  ) : (
-                    <span key={segment.id} className={`posttext-chip tone-${index % 4}`}>
-                      {activeForm.field_config.find((field) => field.id === segment.value)?.label ?? "項目"}
-                      <button
-                        type="button"
-                        onClick={() =>
-                          updatePostTemplate(
-                            activeForm.post_template.filter((current) => current.id !== segment.id),
-                            true,
-                          )
-                        }
-                      >
-                        ×
-                      </button>
-                    </span>
-                  ),
-                )}
+                <textarea
+                  ref={postTextEditorRef}
+                  className="posttext-editor-input"
+                  value={postTextDraft}
+                  onChange={(event) => {
+                    setPostTextDraft(event.target.value);
+                    setPostTextDirty(true);
+                  }}
+                  placeholder={"例:\n【出店者紹介】\n{{shopName}}\n出品ジャンル：{{genre}}\n出品品目：{{items}}"}
+                />
               </div>
 
-              <button
-                type="button"
-                className="posttext-add-text"
-                onClick={() =>
-                  updatePostTemplate(
-                    [
-                      ...activeForm.post_template,
-                      { id: `seg-${crypto.randomUUID()}`, type: "text", value: "" },
-                    ],
-                    true,
-                  )
-                }
-              >
-                + テキストを追加
-              </button>
-
               <p className="posttext-note">
-                テキスト部分は直接クリックして編集できます。タグの × で削除します。
+                <code>{"{{fieldId}}"}</code> 形式のタグが回答内容に置き換わります。回答一覧の投稿文列にも同じ文章が表示されます。
               </p>
             </section>
 
             <aside className="posttext-preview">
               <h2>プレビュー（サンプルデータ）</h2>
-              <div className="posttext-preview-rich">
-                {activeForm.post_template.map((segment, index) =>
-                  segment.type === "field" ? (
-                    <span key={segment.id} className={`posttext-chip tone-${index % 4}`}>
-                      {(() => {
-                        const raw = responses[0]?.data[segment.value];
-                        return Array.isArray(raw) ? raw.join(" / ") : raw || "";
-                      })()}
-                    </span>
-                  ) : (
-                    <span key={segment.id} className="posttext-preview-text">
-                      {segment.value}
-                    </span>
-                  ),
-                )}
+              <div className="posttext-preview-rich posttext-preview-plain">
+                {responses[0] ? renderPostText(editorTextToPostTemplate(postTextDraft), responses[0].data) : postTextDraft}
               </div>
               <button
                 type="button"
                 className="ghost-button"
                 onClick={() => {
                   const text = responses[0]
-                    ? renderPostText(activeForm.post_template, responses[0].data)
+                    ? renderPostText(editorTextToPostTemplate(postTextDraft), responses[0].data)
                     : "";
                   void navigator.clipboard?.writeText(text);
                 }}

@@ -701,6 +701,12 @@ button {
   margin-bottom: 1rem;
 }
 
+.posttext-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .posttext-head h2,
 .posttext-preview h2 {
   font-size: 1.2rem;
@@ -742,6 +748,11 @@ button {
   font-size: 0.9rem;
 }
 
+.posttext-token small {
+  color: rgba(24, 33, 47, 0.56);
+  font-size: 0.74rem;
+}
+
 .posttext-token.tone-0,
 .posttext-chip.tone-0 {
   background: #dce9ff;
@@ -771,9 +782,23 @@ button {
   border: 1px solid var(--line);
   border-radius: 16px;
   background: var(--panel-soft);
-  min-height: 180px;
-  padding: 0.9rem 1rem;
-  line-height: 2.1;
+  min-height: 240px;
+  padding: 0;
+}
+
+.posttext-editor-input {
+  width: 100%;
+  min-height: 240px;
+  resize: vertical;
+  border: 0;
+  background: transparent;
+  padding: 1rem;
+  line-height: 1.8;
+  color: var(--foreground);
+}
+
+.posttext-editor-input:focus {
+  outline: none;
 }
 
 .posttext-chip button {
@@ -817,6 +842,10 @@ button {
   padding: 0.95rem 1rem;
   line-height: 2;
   white-space: pre-wrap;
+}
+
+.posttext-preview-plain {
+  font-size: 0.97rem;
 }
 
 .posttext-copy-hint {
