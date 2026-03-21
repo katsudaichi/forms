@@ -1320,16 +1320,23 @@ button {
 
 .image-editor-layout {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 280px;
+  grid-template-columns: 240px minmax(0, 1fr) 280px;
   gap: 1rem;
   align-items: start;
 }
 
+.image-editor-elements,
 .image-editor-preview {
   padding: 1rem;
   border: 1px solid var(--line);
   border-radius: 22px;
   background: var(--panel-soft);
+}
+
+.image-editor-elements {
+  display: grid;
+  gap: 0.75rem;
+  align-content: start;
 }
 
 .image-editor-indexes {
@@ -1451,7 +1458,10 @@ button {
   bottom: -6px;
 }
 
-.composite-photo[data-selected="true"],
+.composite-photo[data-selected="true"] {
+  z-index: 1;
+}
+
 .composite-text[data-selected="true"] {
   z-index: 4;
 }

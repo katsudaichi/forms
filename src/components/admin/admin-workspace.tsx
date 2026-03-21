@@ -1912,6 +1912,36 @@ export function AdminWorkspace({
                       </div>
 
                       <div className="image-editor-layout">
+                        <div className="image-editor-elements">
+                          <div className="composer-section-label">調整対象</div>
+                          <button
+                            type="button"
+                            className={`composer-element-row ${imageEditorSelectedLayerId === "photo" ? "active" : ""}`}
+                            onClick={() => setImageEditorSelectedLayerId("photo")}
+                          >
+                            <span className="composer-asset-icon">📷</span>
+                            <span>出店者画像エリア</span>
+                          </button>
+
+                          <div className="composer-section-label">テキスト</div>
+                          <div className="composer-elements-list">
+                            {template.textLayers.map((layer) => (
+                              <button
+                                key={layer.id}
+                                type="button"
+                                className={`composer-element-row ${imageEditorSelectedLayerId === layer.id ? "active" : ""}`}
+                                onClick={() => setImageEditorSelectedLayerId(layer.id)}
+                              >
+                                <span className="composer-asset-icon">T</span>
+                                <span>
+                                  {activeForm.field_config.find((field) => field.id === layer.fieldId)?.label ??
+                                    layer.fieldId}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
                         <div className="image-editor-preview">
                           <div className="image-editor-indexes">
                             {response.images.map((_, index) => (
