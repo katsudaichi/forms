@@ -317,6 +317,18 @@ button {
   color: var(--muted);
 }
 
+.form-delete-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 0.7rem 0.85rem;
+  border-radius: 14px;
+  border: 1px solid rgba(239, 68, 68, 0.18);
+  background: rgba(239, 68, 68, 0.05);
+  color: #b91c1c;
+}
+
 .form-accordion-panel a.active {
   background: rgba(47, 109, 246, 0.08);
   border-color: rgba(47, 109, 246, 0.25);

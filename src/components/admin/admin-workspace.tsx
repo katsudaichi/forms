@@ -480,6 +480,46 @@ export function AdminWorkspace({
     }
   }
 
+  async function deleteForm(targetForm: FormRow) {
+    if (!supabase) return;
+
+    const confirmed = window.confirm(`「${targetForm.name}」を削除します。回答一覧も削除されます。`);
+    if (!confirmed) return;
+
+    setSaving(true);
+    setMessage(null);
+
+    const result = await supabase.from("forms").delete().eq("id", targetForm.id);
+
+    setSaving(false);
+
+    if (result.error) {
+      setMessage(result.error.message ?? "フォーム削除に失敗しました。");
+      return;
+    }
+
+    const nextForms = forms.filter((form) => form.id !== targetForm.id);
+    setForms(nextForms);
+    setOpenFormId((current) => (current === targetForm.id ? null : current));
+
+    if (activeForm?.id === targetForm.id) {
+      const nextForm = nextForms[0] ?? null;
+      setActiveForm(nextForm);
+      setResponses([]);
+      setSelectedFieldId(null);
+      setBuilderDirty(false);
+      setSelectedComposerLayerId("photo");
+
+      if (nextForm) {
+        router.push(`/admin/${routeTenantSlug}/${nextForm.id}/builder`);
+      } else {
+        router.push("/admin");
+      }
+    }
+
+    setMessage("フォームを削除しました。");
+  }
+
   async function patchForm(patch: Partial<FormRow>) {
     if (!supabase) return;
     if (!activeForm) return;
@@ -1108,6 +1148,13 @@ export function AdminWorkspace({
                         {item.label}
                       </Link>
                     ))}
+                    <button
+                      type="button"
+                      className="form-delete-button"
+                      onClick={() => void deleteForm(form)}
+                    >
+                      フォーム削除
+                    </button>
                   </div>
                 ) : null}
               </div>
