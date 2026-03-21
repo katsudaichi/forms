@@ -14,8 +14,21 @@ const displayFont = Zen_Old_Mincho({
 });
 
 export const metadata: Metadata = {
-  title: "Event Booth Studio",
-  description: "イベント出店フォームと管理ツールの Supabase MVP",
+  title: "出店フォームビルダー",
+  description: "イベント出店フォームの作成と回答管理ができるツールです。",
+  applicationName: "出店フォームビルダー",
+  openGraph: {
+    title: "出店フォームビルダー",
+    description: "イベント出店フォームの作成と回答管理ができるツールです。",
+    siteName: "出店フォームビルダー",
+    locale: "ja_JP",
+    type: "website",
+  },
+  twitter: {
+    card: "summary",
+    title: "出店フォームビルダー",
+    description: "イベント出店フォームの作成と回答管理ができるツールです。",
+  },
 };
 
 export default function RootLayout({
