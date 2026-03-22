@@ -123,6 +123,20 @@ export function PublicForm({ formId }: { formId: string }) {
     return <div className="page-state">このフォームは現在公開されていません。</div>;
   }
 
+  if (showComplete) {
+    return (
+      <div className="public-shell">
+        <div className="public-complete-page">
+          <div className="public-complete-card">
+            <div className="public-complete-icon">🐾</div>
+            <h2>送信完了しました</h2>
+            <p>ご回答ありがとうございました。</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="public-shell">
       <div className="public-hero">
@@ -282,21 +296,6 @@ export function PublicForm({ formId }: { formId: string }) {
           {message ? <div className="inline-message">{message}</div> : null}
         </div>
       </form>
-
-      <div className={`public-complete-modal ${showComplete ? "show" : ""}`}>
-        <div className="public-complete-card">
-          <div className="public-complete-icon">🐾</div>
-          <h2>登録完了しました</h2>
-          <p>
-            ありがとうございます。<br />
-            担当者より順次ご連絡いたします。<br />
-            当日お会いできるのを楽しみにしています。
-          </p>
-          <button type="button" onClick={() => setShowComplete(false)}>
-            閉じる
-          </button>
-        </div>
-      </div>
     </div>
   );
 }
