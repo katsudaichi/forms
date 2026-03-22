@@ -328,6 +328,56 @@ function drawContainedImage(
   context.drawImage(image, offsetX, offsetY, drawWidth, drawHeight);
 }
 
+function drawWrappedText(
+  context: CanvasRenderingContext2D,
+  text: string,
+  x: number,
+  y: number,
+  maxWidth: number,
+  lineHeight: number,
+  align: "left" | "center" | "right",
+) {
+  const paragraphs = text.split("\n");
+  const lines: string[] = [];
+
+  paragraphs.forEach((paragraph, paragraphIndex) => {
+    if (!paragraph) {
+      lines.push("");
+      return;
+    }
+
+    let currentLine = "";
+    for (const char of Array.from(paragraph)) {
+      const nextLine = `${currentLine}${char}`;
+      if (currentLine && context.measureText(nextLine).width > maxWidth) {
+        lines.push(currentLine);
+        currentLine = char;
+      } else {
+        currentLine = nextLine;
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    if (paragraphIndex < paragraphs.length - 1) {
+      lines.push("");
+    }
+  });
+
+  lines.forEach((line, index) => {
+    const lineY = y + lineHeight * index;
+    if (align === "center") {
+      context.fillText(line, x + maxWidth / 2, lineY, maxWidth);
+    } else if (align === "right") {
+      context.fillText(line, x + maxWidth, lineY, maxWidth);
+    } else {
+      context.fillText(line, x, lineY, maxWidth);
+    }
+  });
+}
+
 export function AdminWorkspace({
   tenantSlug,
   formId,
@@ -1106,17 +1156,17 @@ export function AdminWorkspace({
           context.font = `${layer.bold ? "700" : "400"} ${Math.max(fontSize, 12)}px ${layer.fontFamily ?? "'Noto Sans JP', sans-serif"}`;
           context.fillStyle = layer.color;
           context.textBaseline = "top";
+          const lineHeight = Math.max(fontSize, 12) * 1.3;
 
           if (layer.align === "center") {
             context.textAlign = "center";
-            context.fillText(text, drawX + drawW / 2, drawY, drawW);
           } else if (layer.align === "right") {
             context.textAlign = "right";
-            context.fillText(text, drawX + drawW, drawY, drawW);
           } else {
             context.textAlign = "left";
-            context.fillText(text, drawX, drawY, drawW);
           }
+
+          drawWrappedText(context, text, drawX, drawY, drawW, lineHeight, layer.align);
         });
 
         const blob = await new Promise<Blob | null>((resolve) =>
