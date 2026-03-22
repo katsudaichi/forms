@@ -292,7 +292,6 @@ export function PublicForm({ formId }: { formId: string }) {
           <button className="submit-button" type="submit" disabled={submitting}>
             {submitting ? "送信中..." : "送信する"}
           </button>
-          <p className="public-submit-note">送信後、担当者より確認メールをお送りします。</p>
           {message ? <div className="inline-message">{message}</div> : null}
         </div>
       </form>
