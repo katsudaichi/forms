@@ -1549,6 +1549,9 @@ button {
   cursor: pointer;
   border-radius: 12px;
   padding: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  overflow-wrap: anywhere;
   transition: box-shadow 0.16s ease, background-color 0.16s ease;
   z-index: 3;
 }
