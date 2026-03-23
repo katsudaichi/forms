@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 
-import { resolvePhotoArea } from "@/lib/composite";
+import { resolvePhotoArea, wrapTextByWidth } from "@/lib/composite";
 import { CompositeTemplate } from "@/lib/types";
 
 const COMPOSITE_REFERENCE_WIDTH = 560;
@@ -67,6 +67,21 @@ export function CompositePreview({
       {template.textLayers.map((layer) => {
         const raw = values[layer.fieldId];
         const text = Array.isArray(raw) ? raw.join(" / ") : raw;
+        const fontSize = Math.max(layer.fontSize * scale, 10);
+        const canvas = document.createElement("canvas");
+        const context = canvas.getContext("2d");
+        const wrappedLines =
+          context
+            ? (() => {
+                context.font = `${layer.bold ? "700" : "400"} ${fontSize}px ${layer.fontFamily ?? "'Noto Sans JP', sans-serif"}`;
+                return wrapTextByWidth(
+                  text || "テキスト",
+                  (layer.w / 100) * containerWidth,
+                  (value) => context.measureText(value).width,
+                );
+              })()
+            : [text || "テキスト"];
+
         return (
           <div
             key={layer.id}
@@ -76,7 +91,7 @@ export function CompositePreview({
               left: `${layer.x}%`,
               top: `${layer.y}%`,
               width: `${layer.w}%`,
-              fontSize: `${Math.max(layer.fontSize * scale, 10)}px`,
+              fontSize: `${fontSize}px`,
               fontFamily: layer.fontFamily ?? "'Noto Sans JP', sans-serif",
               color: layer.color,
               fontWeight: layer.bold ? 700 : 400,
@@ -84,7 +99,12 @@ export function CompositePreview({
             }}
             onClick={() => onSelectLayer?.(layer.id)}
           >
-            {text || "テキスト"}
+            {wrappedLines.map((line, index) => (
+              <Fragment key={`${layer.id}-${index}`}>
+                {line || "\u00A0"}
+                {index < wrappedLines.length - 1 ? <br /> : null}
+              </Fragment>
+            ))}
             {selectedLayerId === layer.id ? (
               <span className="composite-selection composite-selection-text" aria-hidden="true" />
             ) : null}

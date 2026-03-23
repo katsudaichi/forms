@@ -24,6 +24,43 @@ export function resolvePhotoArea(template: CompositeTemplate) {
   };
 }
 
+export function wrapTextByWidth(
+  text: string,
+  maxWidth: number,
+  measureText: (value: string) => number,
+) {
+  const paragraphs = text.split("\n");
+  const lines: string[] = [];
+
+  paragraphs.forEach((paragraph, paragraphIndex) => {
+    if (!paragraph) {
+      lines.push("");
+      return;
+    }
+
+    let currentLine = "";
+    for (const char of Array.from(paragraph)) {
+      const nextLine = `${currentLine}${char}`;
+      if (currentLine && measureText(nextLine) > maxWidth) {
+        lines.push(currentLine);
+        currentLine = char;
+      } else {
+        currentLine = nextLine;
+      }
+    }
+
+    if (currentLine) {
+      lines.push(currentLine);
+    }
+
+    if (paragraphIndex < paragraphs.length - 1) {
+      lines.push("");
+    }
+  });
+
+  return lines;
+}
+
 export function normalizeCompositeConfig(
   input: CompositeConfig | CompositeTemplate | null | undefined,
 ): CompositeConfig {

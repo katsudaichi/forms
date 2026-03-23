@@ -23,6 +23,7 @@ import {
   resolvePhotoArea,
   resolveResponseImageTemplate,
   updateCompositePattern,
+  wrapTextByWidth,
 } from "@/lib/composite";
 import { createClient, isSupabaseConfigured } from "@/lib/supabase/client";
 import {
@@ -337,34 +338,7 @@ function drawWrappedText(
   lineHeight: number,
   align: "left" | "center" | "right",
 ) {
-  const paragraphs = text.split("\n");
-  const lines: string[] = [];
-
-  paragraphs.forEach((paragraph, paragraphIndex) => {
-    if (!paragraph) {
-      lines.push("");
-      return;
-    }
-
-    let currentLine = "";
-    for (const char of Array.from(paragraph)) {
-      const nextLine = `${currentLine}${char}`;
-      if (currentLine && context.measureText(nextLine).width > maxWidth) {
-        lines.push(currentLine);
-        currentLine = char;
-      } else {
-        currentLine = nextLine;
-      }
-    }
-
-    if (currentLine) {
-      lines.push(currentLine);
-    }
-
-    if (paragraphIndex < paragraphs.length - 1) {
-      lines.push("");
-    }
-  });
+  const lines = wrapTextByWidth(text, maxWidth, (value) => context.measureText(value).width);
 
   lines.forEach((line, index) => {
     const lineY = y + lineHeight * index;
